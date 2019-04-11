@@ -1,7 +1,6 @@
-package VirtualTreesD;
+package VirtualTreesD_FMX;
 
 {$R *.res}
-{$R '..\..\Design\VirtualTrees.dcr'}
 {$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
 {$ALIGN 8}
 {$ASSERTIONS ON}
@@ -10,13 +9,13 @@ package VirtualTreesD;
 {$EXTENDEDSYNTAX ON}
 {$IMPORTEDDATA ON}
 {$IOCHECKS ON}
-{$LOCALSYMBOLS ON}
+{$LOCALSYMBOLS OFF}
 {$LONGSTRINGS ON}
 {$OPENSTRINGS ON}
 {$OPTIMIZATION ON}
 {$OVERFLOWCHECKS OFF}
 {$RANGECHECKS OFF}
-{$REFERENCEINFO ON}
+{$REFERENCEINFO OFF}
 {$SAFEDIVIDE OFF}
 {$STACKFRAMES OFF}
 {$TYPEDADDRESS OFF}
@@ -24,19 +23,16 @@ package VirtualTreesD;
 {$WRITEABLECONST OFF}
 {$MINENUMSIZE 1}
 {$IMAGEBASE $400000}
+{$DEFINE VT_FMX}
 {$DEFINE RELEASE}
 {$ENDIF IMPLICITBUILDING}
-{$DESCRIPTION 'VirtualTreeView Controls'}
-{$LIBSUFFIX '26'}
-{$DESIGNONLY}
-{$IMPLICITBUILD OFF}
+{$IMPLICITBUILD ON}
 
 requires
-  DesignIDE,
-  VirtualTreesR;
+  rtl,
+  fmx;
 
 contains
   VirtualTreesReg in '..\..\Design\VirtualTreesReg.pas';
 
 end.
-

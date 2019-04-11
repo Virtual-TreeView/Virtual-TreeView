@@ -28,13 +28,30 @@ interface
 {$WARN UNSAFE_CAST OFF}
 {$WARN UNSAFE_CODE OFF}
 
+//{$DEFINE VT_FMX}
+{$IFNDEF VT_FMX}
+  {$DEFINE VT_VCL}
+{$ENDIF}
+
 uses
+{$IFDEF VT_FMX}
+  System.Types,
+  System.Sysutils,
+  FMX.Graphics,
+  FMX.ImgList,
+  System.ImageList,
+  FMX.Types,
+  VirtualTrees,
+  VirtualTrees.FMX,
+  System.UITypes;
+{$ELSE}
   Winapi.Windows,
   Winapi.ActiveX,
   System.Types,
   Vcl.Graphics,
   Vcl.ImgList,
   Vcl.Controls;
+{$ENDIF}
 
 
 type
@@ -46,7 +63,9 @@ type
     bmConstantAlphaAndColor  // blend the destination color with the given constant color und the constant alpha value
   );
 
-procedure AlphaBlend(Source, Destination: HDC; R: TRect; Target: TPoint; Mode: TBlendMode; ConstantAlpha, Bias: Integer);
+
+procedure AlphaBlend(Source, Destination: TCanvas; R: TRect; Target: TPoint; Mode: TBlendMode; ConstantAlpha: Integer; Bias: {$IFDEF VT_FMX}TAlphaColor{$ELSE}Integer{$ENDIF});
+{$IFDEF VT_VCL}
 function GetRGBColor(Value: TColor): DWORD;
 procedure PrtStretchDrawDIB(Canvas: TCanvas; DestRect: TRect; ABitmap: TBitmap);
 
@@ -59,23 +78,25 @@ procedure SetCanvasOrigin(Canvas: TCanvas; X, Y: Integer); inline;
 procedure ClipCanvas(Canvas: TCanvas; ClipRect: TRect; VisibleRegion: HRGN = 0);
 
 procedure DrawImage(ImageList: TCustomImageList; Index: Integer; Canvas: TCanvas; X, Y: Integer; Style: Cardinal; Enabled: Boolean);
+{$ENDIF}
 
 
 // Adjusts the given string S so that it fits into the given width. EllipsisWidth gives the width of
 // the three points to be added to the shorted string. If this value is 0 then it will be determined implicitely.
 // For higher speed (and multiple entries to be shorted) specify this value explicitely.
-function ShortenString(DC: HDC; const S: string; Width: Integer; EllipsisWidth: Integer = 0): string;
+function ShortenString(ACanvas: TCanvas; const S: string; Width: {$IFDEF VT_FMX}Single{$ELSE}Integer{$ENDIF}; EllipsisWidth: {$IFDEF VT_FMX}Single{$ELSE}Integer{$ENDIF} = 0): string;
 
 // Wrap the given string S so that it fits into a space of given width.
 // RTL determines if right-to-left reading is active.
-function WrapString(DC: HDC; const S: string; const Bounds: TRect; RTL: Boolean; DrawFormat: Cardinal): string;
+function WrapString(ACanvas: TCanvas; const S: string; const Bounds: TRect; RTL: Boolean; DrawFormat: Cardinal): string;
 
 // Calculates bounds of a drawing rectangle for the given string
-procedure GetStringDrawRect(DC: HDC; const S: string; var Bounds: TRect; DrawFormat: Cardinal);
+procedure GetStringDrawRect(ACanvas: TCanvas; const S: string; var Bounds: TRect; DrawFormat: Cardinal);
 
 // Converts the incoming rectangle so that left and top are always less than or equal to right and bottom.
 function OrderRect(const R: TRect): TRect;
 
+{$IFDEF VT_VCL}
 // Fills the given rectangles with values which can be used while dragging around an image
 // (used in DragMove of the drag manager and DragTo of the header columns).
 procedure FillDragRectangles(DragWidth, DragHeight, DeltaX, DeltaY: Integer; var RClip, RScroll, RSamp1, RSamp2, RDraw1, RDraw2: TRect);
@@ -93,20 +114,25 @@ procedure ScaleImageList(const ImgList: TImageList; M, D: Integer);
 
 /// Returns True if the high contrast theme is anabled in the system settings, False otherwise.
 function IsHighContrastEnabled(): Boolean;
-
+{$ENDIF}
 
 implementation
-
 uses
+{$IFDEF VT_FMX}
+  System.Math;
+{$ELSE}
   Winapi.CommCtrl,
   Winapi.ShlObj,
   System.SysUtils,
   System.StrUtils,
   System.Math;
+{$ENDIF}
+
 
 const
   WideLF = Char(#10);
 
+{$IFDEF VT_VCL}
 procedure ApplyDragImage(const pDataObject: IDataObject; pBitmap: TBitmap);
 var
   DragSourceHelper: IDragSourceHelper;
@@ -136,7 +162,7 @@ begin
     end;//if not InitializeFromWindow
   end;
 end;
-
+{$ENDIF}
 
 function OrderRect(const R: TRect): TRect;
 
@@ -164,8 +190,7 @@ begin
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
-
-
+{$IFDEF VT_VCL}
 procedure SetBrushOrigin(Canvas: TCanvas; X, Y: Integer);
 
 // Set the brush origin of a given canvas.
@@ -217,29 +242,44 @@ begin
   SelectClipRgn(Canvas.Handle, ClipRegion);
   DeleteObject(ClipRegion);
 end;
+{$ENDIF}
+
 
 //----------------------------------------------------------------------------------------------------------------------
 
 
-procedure GetStringDrawRect(DC: HDC; const S: string; var Bounds: TRect; DrawFormat: Cardinal);
-
+procedure GetStringDrawRect(ACanvas: TCanvas; const S: string; var Bounds: TRect; DrawFormat: Cardinal);
 begin
+{$IFDEF VT_FMX}
+  Bounds:= Rect(0, 0, ACanvas.TextWidth(S), ACanvas.TextHeight(S));
+{$ELSE}
   Bounds.Right := Bounds.Left + 1;
   Bounds.Bottom := Bounds.Top + 1;
 
-  Winapi.Windows.DrawTextW(DC, PWideChar(S), Length(S), Bounds, DrawFormat or DT_CALCRECT);
+  Winapi.Windows.DrawTextW(ACanvas.Handle, PWideChar(S), Length(S), Bounds, DrawFormat or DT_CALCRECT);
+{$ENDIF}
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
+procedure DrawEdge(TargetCanvas: TCanvas; PaintRectangle: TRectF; PressedButtonStyle, PressedButtonFlags: Cardinal);
+begin
+  //TODO: DrawEdge
+  //NormalButtonStyle
+  //RaisedButtonStyle
+  //RaisedButtonFlags or RightBorderFlag
+  //NormalButtonFlags or RightBorderFlag
+end;
 
-function ShortenString(DC: HDC; const S: string; Width: Integer; EllipsisWidth: Integer = 0): string;
+//----------------------------------------------------------------------------------------------------------------------
+
+function ShortenString(ACanvas: TCanvas; const S: string; Width: {$IFDEF VT_FMX}Single{$ELSE}Integer{$ENDIF}; EllipsisWidth: {$IFDEF VT_FMX}Single{$ELSE}Integer{$ENDIF} = 0): string;
 
 var
   Size: TSize;
   Len: Integer;
-  L, H, N, W: Integer;
-
+  L, H, N: Integer;
+  W: {$IFDEF VT_FMX}Single{$ELSE}Integer{$ENDIF};
 begin
   Len := Length(S);
   if (Len = 0) or (Width <= 0) then
@@ -249,7 +289,7 @@ begin
     // Determine width of triple point using the current DC settings (if not already done).
     if EllipsisWidth = 0 then
     begin
-      GetTextExtentPoint32W(DC, '...', 3, Size);
+      GetTextExtentPoint32W(ACanvas{$IFDEF VT_VCL}.Handle{$ENDIF}, '...', 3, Size);
       EllipsisWidth := Size.cx;
     end;
 
@@ -262,7 +302,7 @@ begin
       while L < H do
       begin
         N := (L + H + 1) shr 1;
-        GetTextExtentPoint32W(DC, PWideChar(S), N, Size);
+        GetTextExtentPoint32W(ACanvas{$IFDEF VT_VCL}.Handle{$ENDIF}, {$IFDEF VT_VCL}PWideChar{$ENDIF}(S), N, Size);
         W := Size.cx + EllipsisWidth;
         if W <= Width then
           L := N
@@ -281,10 +321,21 @@ begin
   end;
 end;
 
+{$IFDEF VT_FMX}
+
 //----------------------------------------------------------------------------------------------------------------------
 
-function WrapString(DC: HDC; const S: string; const Bounds: TRect; RTL: Boolean; DrawFormat: Cardinal): string;
+procedure GetTextExtentPoint32W(ACanvas: TCanvas; CaptionText: String; Len: Integer; Var Size: TSizeF);
+begin
+  Size.cx:= ACanvas.TextWidth(Copy(CaptionText, 1, Len));
+  Size.cy:= ACanvas.TextHeight(Copy(CaptionText, 1, Len));
+end;
 
+{$ENDIF}
+//----------------------------------------------------------------------------------------------------------------------
+
+function WrapString(ACanvas: TCanvas; const S: string; const Bounds: TRect; RTL: Boolean; DrawFormat: Cardinal): string;
+{$IFDEF VT_VCL}
 var
   Width,
   Len,
@@ -295,8 +346,11 @@ var
   Line: string;
   Words: array of string;
   R: TRect;
-
+{$ENDIF}
 begin
+{$IFDEF VT_FMX}
+  Result:= S;
+{$ELSE}
   Result := '';
   // Leading and trailing are ignored.
   Buffer := Trim(S);
@@ -333,7 +387,7 @@ begin
 
       while WordCounter > 0 do
       begin
-        GetStringDrawRect(DC, Line + IfThen(WordsInLine > 0, ' ', '') + Words[WordCounter - 1], R, DrawFormat);
+        GetStringDrawRect(ACanvas, Line + IfThen(WordsInLine > 0, ' ', '') + Words[WordCounter - 1], R, DrawFormat);
         if R.Right > Width then
         begin
           // If at least one word fits into this line then continue with the next line.
@@ -345,7 +399,7 @@ begin
           begin
             for Len := Length(Buffer) - 1 downto 2 do
             begin
-              GetStringDrawRect(DC, RightStr(Buffer, Len), R, DrawFormat);
+              GetStringDrawRect(ACanvas, RightStr(Buffer, Len), R, DrawFormat);
               if R.Right <= Width then
                 Break;
             end;
@@ -389,7 +443,7 @@ begin
 
       while WordCounter > 0 do
       begin
-        GetStringDrawRect(DC, Line + IfThen(WordsInLine > 0, ' ', '') + Words[WordCounter - 1], R, DrawFormat);
+        GetStringDrawRect(ACanvas, Line + IfThen(WordsInLine > 0, ' ', '') + Words[WordCounter - 1], R, DrawFormat);
         if R.Right > Width then
         begin
           // If at least one word fits into this line then continue with the next line.
@@ -401,7 +455,7 @@ begin
           begin
             for Len := Length(Buffer) - 1 downto 2 do
             begin
-              GetStringDrawRect(DC, LeftStr(Buffer, Len), R, DrawFormat);
+              GetStringDrawRect(ACanvas, LeftStr(Buffer, Len), R, DrawFormat);
               if R.Right <= Width then
                 Break;
             end;
@@ -429,12 +483,15 @@ begin
 
   Len := Length(Result);
   if Result[Len] = WideLF then
-    SetLength(Result, Len - 1);
+    SetLength(Result, Len - 1);  
+{$ENDIF}
+
+
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-
+{$IFDEF VT_VCL}
 function CalculateScanline(Bits: Pointer; Width, Height, Row: Integer): Pointer;
 
 // Helper function to calculate the start address for the given row.
@@ -450,7 +507,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-function GetBitmapBitsFromDeviceContext(DC: HDC; var Width, Height: Integer): Pointer;
+function GetBitmapBitsFromDeviceContext(ACanvas: TCanvas; var Width, Height: Integer): Pointer;
 
 // Helper function used to retrieve the bitmap selected into the given device context. If there is a bitmap then
 // the function will return a pointer to its bits otherwise nil is returned.
@@ -465,7 +522,7 @@ begin
   Width := 0;
   Height := 0;
 
-  Bitmap := GetCurrentObject(DC, OBJ_BITMAP);
+  Bitmap := GetCurrentObject(ACanvas.Handle, OBJ_BITMAP);
   if Bitmap <> 0 then
   begin
     if GetObject(Bitmap, SizeOf(DIB), @DIB) = SizeOf(DIB) then
@@ -1020,8 +1077,64 @@ end;
 {$endif CPUX64}
 
 //----------------------------------------------------------------------------------------------------------------------
+{$ENDIF}
 
-procedure AlphaBlend(Source, Destination: HDC; R: TRect; Target: TPoint; Mode: TBlendMode; ConstantAlpha, Bias: Integer);
+{$IFDEF VT_FMX}
+procedure AlphaBlend(Source, Destination: TCanvas; R: TRect; Target: TPoint; Mode: TBlendMode; ConstantAlpha: Integer; Bias: {$IFDEF VT_FMX}TAlphaColor{$ELSE}Integer{$ENDIF});
+
+// R describes the source rectangle to work on.
+// Target is the place (upper left corner) in the target bitmap where to blend to. Note that source width + X offset
+// must be less or equal to the target width. Similar for the height.
+// If Mode is bmConstantAlpha then the blend operation uses the given ConstantAlpha value for all pixels.
+// If Mode is bmPerPixelAlpha then each pixel is blended using its individual alpha value (the alpha value of the source).
+// If Mode is bmMasterAlpha then each pixel is blended using its individual alpha value multiplied by ConstantAlpha.
+// If Mode is bmConstantAlphaAndColor then each destination pixel is blended using ConstantAlpha but also a constant
+// color which will be obtained from Bias. In this case no offset value is added, otherwise Bias is used as offset.
+// Blending of a color into target only (bmConstantAlphaAndColor) ignores Source (the DC) and Target (the position).
+// CAUTION: This procedure does not check whether MMX instructions are actually available! Call it only if MMX is really
+//          usable.
+
+
+Var SrcRect: TRect;
+begin
+  if not IsRectEmpty(R) then
+  begin
+    SrcRect.Left:= Target.X;
+    SrcRect.Top:= Target.Y;
+    SrcRect.Width:= R.Width;
+    SrcRect.Height:= R.Height;
+
+    // Note: it is tempting to optimize the special cases for constant alpha 0 and 255 by just ignoring soure
+    //       (alpha = 0) or simply do a blit (alpha = 255). But this does not take the bias into account.
+    case Mode of
+      bmConstantAlpha:
+        begin
+          //this should be ok
+          Destination.DrawBitmap(Source.Bitmap, SrcRect, R, ConstantAlpha/255.0, false);
+        end;
+      bmPerPixelAlpha:
+        begin
+          //TODO: AlphaBlend temporary not what asked!  AlphaColorToScanline
+          Destination.DrawBitmap(Source.Bitmap, SrcRect, R, ConstantAlpha/255.0, false);
+        end;
+      bmMasterAlpha:
+        begin
+          //TODO: AlphaBlend temporary not what asked! AlphaColorToScanline
+          Destination.DrawBitmap(Source.Bitmap, SrcRect, R, ConstantAlpha/255.0, false);
+        end;
+      bmConstantAlphaAndColor:
+        begin
+          // Source is ignored since there is a constant color value.
+          // it looks like dummyCanvas is not needed for bmConstantAlphaAndColor as Source is simply ignored and we can pass nil instead of dummyCanvas with handle=0
+          // i leave it. because maybe in the future someone change bmConstantAlphaAndColor to something else
+          Destination.Fill.Color:= bias;
+          Destination.FillRect(R, 0, 0, [], ConstantAlpha/255.0);
+        end;
+    end;
+  end;
+end;
+{$ELSE}
+procedure AlphaBlend(Source, Destination: TCanvas; R: TRect; Target: TPoint; Mode: TBlendMode; ConstantAlpha, Bias: Integer);
 
 // Optimized alpha blend procedure using MMX instructions to perform as quick as possible.
 // For this procedure to work properly it is important that both source and target bitmap use the 32 bit color format.
@@ -1125,7 +1238,9 @@ begin
     end;
   end;
 end;
+{$ENDIF}
 
+{$IFDEF VT_VCL}
 function GetRGBColor(Value: TColor): DWORD;
 
 // Little helper to convert a Delphi color to an image list color.
@@ -1367,6 +1482,7 @@ begin
   end;
 end;
 
+
 function IsHighContrastEnabled(): Boolean;
 var
   l: HIGHCONTRAST;
@@ -1375,5 +1491,6 @@ begin
   Result := SystemParametersInfo(SPI_GETHIGHCONTRAST, 0, @l, 0) and ((l.dwFlags and HCF_HIGHCONTRASTON) <> 0);
 end;
 
+{$ENDIF}
 
 end.
